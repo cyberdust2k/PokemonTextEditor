@@ -28,11 +28,11 @@ QList<uint> searchsequence(const QByteArray &seq)
     {
         // check if following bytes are same as sequence
         int i = 1;
-        for (; i < slen-1; i++)
+        for (; i < slen; i++)
             if (rom[current+i] != (uchar)(seq.at(i)))
                 break;
 
-        if (i == slen-1)
+        if (i == slen)
             occurrences.push_back((uint)current);
 
         current = indexof(seq.at(0), (uint)(current + i));

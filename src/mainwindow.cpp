@@ -587,6 +587,7 @@ void MainWindow::on_treeWidget_customContextMenuRequested(const QPoint &pos)
         QMenu contextMenu;
         QAction *addSub = contextMenu.addAction("Add sub-folder");
         QAction *addTxt = contextMenu.addAction("Add text entry");
+        QAction *header = contextMenu.addAction("Add head folder");
         QAction *remSub = contextMenu.addAction("Remove sub-folder");
         QAction *rename = contextMenu.addAction("Rename sub-folder");
         QAction *result = contextMenu.exec(ui->treeWidget->mapToGlobal(pos));
@@ -676,7 +677,10 @@ void MainWindow::on_treeWidget_customContextMenuRequested(const QPoint &pos)
 
             if (result == QMessageBox::Yes)
             {
-                item->parent()->removeChild(item);
+                if (item->parent() != NULL) /* topmost */
+                    item->parent()->removeChild(item);
+
+                delete item;
                 writeini();
                 ui->treeWidget->update();
             }
@@ -699,6 +703,27 @@ void MainWindow::on_treeWidget_customContextMenuRequested(const QPoint &pos)
                 ui->treeWidget->update();
             }
         }
+        else if (result == header)
+        {
+            bool result = false;
+            QString name = QInputDialog::getText(
+                        this,
+                        "Choose folder name",
+                        "Name:",
+                        QLineEdit::Normal,
+                        "Folder",
+                        &result
+                        );
+
+            if (result && !name.isEmpty())
+            {
+                QTreeWidgetItem *i = new QTreeWidgetItem;
+                i->setText(0, name);
+                i->setData(0, Qt::UserRole, 0U);
+                ui->treeWidget->addTopLevelItem(i);
+                ui->treeWidget->update();
+            }
+        }
     }
     else
     {
@@ -716,6 +741,7 @@ void MainWindow::on_treeWidget_customContextMenuRequested(const QPoint &pos)
             if (res == QMessageBox::Yes)
             {
                 item->parent()->removeChild(item);
+                delete item;
                 writeini();
             }
         }

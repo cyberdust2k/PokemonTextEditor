@@ -66,7 +66,9 @@ void insertwindow::on_treeWidget_customContextMenuRequested(const QPoint &pos)
         // is folder
         QMenu contextMenu;
         QAction *add = contextMenu.addAction("Add sub-folder");
-        if (contextMenu.exec(tree->mapToGlobal(pos)) == add)
+        QAction *hdr = contextMenu.addAction("Add head folder");
+        QAction *res = contextMenu.exec(tree->mapToGlobal(pos));
+        if (res == add)
         {
             bool result = false;
             QString name = QInputDialog::getText(
@@ -84,6 +86,27 @@ void insertwindow::on_treeWidget_customContextMenuRequested(const QPoint &pos)
                 i->setText(0, name);
                 i->setData(0, Qt::UserRole, 0U);
                 item->addChild(i);
+                tree->update();
+            }
+        }
+        else if (res == hdr)
+        {
+            bool result = false;
+            QString name = QInputDialog::getText(
+                        this,
+                        "Choose folder name",
+                        "Name:",
+                        QLineEdit::Normal,
+                        "Folder",
+                        &result
+                        );
+
+            if (result && !name.isEmpty())
+            {
+                QTreeWidgetItem *i = new QTreeWidgetItem;
+                i->setText(0, name);
+                i->setData(0, Qt::UserRole, 0U);
+                tree->addTopLevelItem(i);
                 tree->update();
             }
         }

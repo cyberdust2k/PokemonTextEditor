@@ -1,6 +1,8 @@
 #include "mainwindow.h"
 #include "searchwindow.h"
 #include "insertwindow.h"
+#include "aboutwindow.h"
+#include "fswindow.h"
 #include "ui_mainwindow.h"
 #include <QFileDialog>
 #include <QMessageBox>
@@ -9,6 +11,10 @@
 
 
 bool blockActive = false;
+namespace {
+uchar *byrom;
+uint szrom;
+}
 
 
 MainWindow::MainWindow(QWidget *parent) :
@@ -24,7 +30,41 @@ MainWindow::MainWindow(QWidget *parent) :
 
 MainWindow::~MainWindow()
 {
+    delete byrom;
     delete ui;
+}
+
+
+qint64 indexof(uchar b, uint i)
+{
+    for (; i < szrom; i++)
+        if (byrom[i] == b)
+            return i;
+
+    return -1;
+}
+
+QList<uint> searchsequence(const QByteArray &seq)
+{
+    int slen = seq.length();
+    QList<uint> occurrences;
+    qint64 current = indexof(seq.at(0), 0x100);
+
+    while (current >= 0 && current <= (szrom - slen))
+    {
+        // check if following bytes are same as sequence
+        int i = 1;
+        for (; i < slen-1; i++)
+            if (byrom[current+i] != (uchar)(seq.at(i)))
+                break;
+
+        if (i == slen-1)
+            occurrences.push_back((uint)current);
+
+        current = indexof(seq.at(0), (uint)(current + i));
+    }
+
+    return occurrences;
 }
 
 
@@ -121,11 +161,12 @@ void MainWindow::repoint(uint oldoff, uint newoff)
     uint nptr = newoff + 0x08000000;
     char *bnptr = new char[4];
     ((uint*)(bnptr))[0] = nptr;
+    QByteArray sold(bptr, 4);
 
     // search for references to 'oldoff' and replace them
     // with the new pointer to 'newoff'.
-    auto it = std::search(byrom, byrom + szrom, bptr, bptr + 4);
-    if (it == (byrom + szrom))
+    QList<uint> foundoffs = searchsequence(sold);
+    if (foundoffs.isEmpty())
     {
         QMessageBox::information(this, "Repoint", "Pointer to text not found! Repointing aborted.");
         return;
@@ -133,25 +174,19 @@ void MainWindow::repoint(uint oldoff, uint newoff)
     else
     {
         // find and replace all
-        QStringList foundoffs;
-        uchar *current = byrom;
-        uint remSize = szrom - (byrom - current);
-        do
+        for (int i = 0; i < foundoffs.size(); i++)
         {
-            uint off = std::distance(byrom, it);
-            foundoffs.push_back(QString::number(off, 16));
-            seek(off);
-            writeWord(nptr);
-            current = byrom + off;
-            remSize = szrom - (byrom - current);
-            it = std::search(current, current + remSize, bptr, bptr + 4);
-        } while (it != (byrom + szrom));
+            seek(foundoffs.at(i));
+            uchar *romloc = (byrom + bypos);
+            for (int j = 0; j < 4; j++)
+                romloc[j] = bnptr[j];
+        }
 
         // generate message string
         QString msg;
         msg.append("References replaced. Found at:\n\n");
-        foreach (QString s, foundoffs)
-            msg.append(QString("    0x") + s + "\n");
+        foreach (uint s, foundoffs)
+            msg.append(QString("    0x") + QString::number(s, 16) + "\n");
         QMessageBox::information(this, "Repoint", msg);
     }
 }
@@ -160,8 +195,7 @@ void MainWindow::setupui(bool b)
 {
     ui->actionSave_ROM->setEnabled(b);
     ui->actionSearch_Text->setEnabled(b);
-    ui->actionCreate_specific_INI->setEnabled(b);
-    ui->actionWrite_current_text->setEnabled(b);
+    ui->actionCreate_specific_INI->setEnabled(b);;
     ui->treeWidget->setEnabled(b);
     ui->plainTextEdit->setEnabled(b);
 
@@ -169,9 +203,13 @@ void MainWindow::setupui(bool b)
     {
         ui->treeWidget->clear();
         ui->statusbar->clearMessage();
+        ui->statusbar2->clearMessage();
+        ui->statusbar2->setStyleSheet("QStatusBar#statusbar2{border-bottom: 1px solid #b9b9b9; background-color: #EFEBE7;}");
     }
     else
     {
+        ui->statusbar2->setStyleSheet("QStatusBar#statusbar2{border-bottom: 1px solid #b9b9b9; background-color: #FFFFFF;}");
+
         // create backup
         QString fpbak(fprom);
         fpbak.replace(".gba", ".pte_bak");
@@ -444,8 +482,10 @@ void MainWindow::on_treeWidget_itemDoubleClicked(QTreeWidgetItem *item, int colu
     text.replace("\\l", "\\l\n");
     text.replace("\\n", "\\n\n");
 
+    ui->actionWrite_current_text->setEnabled(true);
     ui->plainTextEdit->setPlainText(text);
     ui->statusbar2->showMessage(QString("Offset: 0x%0, Length: %1 bytes").arg(QString::number(offs, 16), QString::number(textlen)));
+    last = item;
 }
 
 void MainWindow::on_actionSave_ROM_triggered()
@@ -663,5 +703,119 @@ void MainWindow::on_treeWidget_customContextMenuRequested(const QPoint &pos)
     else
     {
         // is text entry
+        QMenu contextMenu;
+        QAction *remove = contextMenu.addAction("Remove this entry");
+        QAction *rename = contextMenu.addAction("Rename this entry");
+        QAction *result = contextMenu.exec(ui->treeWidget->mapToGlobal(pos));
+
+        if (result == remove)
+        {
+            QString msg("Do you really want to remove this entry?");
+            QMessageBox::StandardButton res = QMessageBox::question(this, "Entry", msg);
+
+            if (res == QMessageBox::Yes)
+            {
+                item->parent()->removeChild(item);
+                writeini();
+            }
+        }
+        else if (result == rename)
+        {
+            bool res = false;
+            QString name = QInputDialog::getText(
+                        this,
+                        "Choose new name",
+                        "Name:",
+                        QLineEdit::Normal,
+                        item->text(0),
+                        &res);
+
+            if (res && !name.isEmpty())
+            {
+                item->setText(0, name);
+                writeini();
+                ui->treeWidget->update();
+            }
+        }
+    }
+}
+
+void MainWindow::on_actionAbout_triggered()
+{
+    aboutwindow aw;
+    aw.exec();
+}
+
+void MainWindow::on_actionWrite_current_text_triggered()
+{
+    QString text = ui->plainTextEdit->toPlainText();
+
+    // removes all newlines
+    text.replace("\n", "");
+
+    // converts text to bytes
+    QByteArray bytes = getstringbytes(text);
+
+    // check if repoint might be required
+    uint oldlen = last->data(1, Qt::UserRole).toUInt();
+    uint offtowrite = last->data(0, Qt::UserRole).toUInt();
+    if ((uint)bytes.size() > oldlen)
+    {
+        // search for possible leading FF space
+        uint diff = ((uint)bytes.size() - oldlen) + 1 /* ending FF */;
+        uint oldoff = last->data(0, Qt::UserRole).toUInt();
+        seek(oldoff + oldlen);
+
+        uint i = 0;
+        for (; i < diff; i++)
+            if (byrom[bypos+i] != 0xFF)
+                break;
+
+        if (i != diff)
+        {
+            QMessageBox::information(
+                        this,
+                        "Write",
+                        "The new text is longer than the old one and the leading 0xFF bytes are not enough. Repointing required.");
+
+            // repoint definitely required
+            fswindow fw;
+            fw.setrom(byrom, szrom);
+            fw.setneeded(bytes.size()+1);
+
+            int c = fw.exec();
+            if (c == QDialog::Accepted)
+            {
+                offtowrite = fw.found();
+                repoint(oldoff, offtowrite);
+            }
+            else
+            {
+                QMessageBox::information(
+                            this,
+                            "Write",
+                            "Compiling aborted. Nothing was written.");
+
+                return;
+            }
+        }
+    }
+
+    // write text
+    seek(offtowrite);
+    uchar *current = byrom + bypos;
+    for (int i = 0; i < bytes.size(); i++)
+        current[i] = (uchar)bytes.at(i);
+
+    if (QMessageBox::question(
+                this,
+                "Write",
+                "Text written successfully. Do you want to update the INI entry? (only recommended for 'specific INIs')")
+            == QMessageBox::Yes)
+    {
+        last->setData(0, Qt::UserRole, QVariant(offtowrite));
+        writeini();
+        ui->treeWidget->update();
+        on_treeWidget_itemDoubleClicked(last, 0);
     }
 }

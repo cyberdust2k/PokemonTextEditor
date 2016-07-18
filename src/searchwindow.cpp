@@ -8,6 +8,7 @@ uchar *rom;
 uint szrom;
 
 
+namespace {
 qint64 indexof(uchar b, uint i)
 {
     for (; i < szrom; i++)
@@ -38,6 +39,7 @@ QList<uint> searchsequence(const QByteArray &seq)
     }
 
     return occurrences;
+}
 }
 
 

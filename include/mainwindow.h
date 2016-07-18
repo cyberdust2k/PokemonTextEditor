@@ -39,17 +39,17 @@ private slots:
     void on_actionSave_ROM_triggered();
     void on_actionCreate_specific_INI_triggered();
     void on_actionSearch_Text_triggered();
-
     void on_treeWidget_customContextMenuRequested(const QPoint &pos);
+    void on_actionAbout_triggered();
+    void on_actionWrite_current_text_triggered();
 
 private:
     Ui::MainWindow *ui;
     std::fstream rom;
-    uchar *byrom;
     uint bypos;
-    uint szrom;
     QString fprom;
     QString fpini;
+    QTreeWidgetItem *last;
 };
 
 #endif // MAINWINDOW_H

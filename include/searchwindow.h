@@ -16,20 +16,24 @@ public:
     explicit searchwindow(QWidget *parent = 0);
     ~searchwindow();
 
-    void settree(QTreeWidget *tree);
-    void setini(QString path);
     void setrom(uchar *r, uint n);
     void setstr(int index);
+    QString selected();
+    uint selectedOff();
 
 private slots:
     void on_pushButton_2_clicked();
     void on_pushButton_3_clicked();
+    void on_pushButton_4_clicked();
+    void on_pushButton_5_clicked();
+    void on_pushButton_clicked();
 
 private:
     Ui::searchwindow *ui;
     QTreeWidget *utree;
     QString fpini;
     QStringList texts;
+    QList<uint> textoffs;
     int currpos;
 };
 

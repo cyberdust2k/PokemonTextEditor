@@ -30,6 +30,7 @@ public:
     void writeHWord(unsigned short hword);
     void writeByte(unsigned char byte);
     void seek(uint offs);
+    void writeini();
 
 private slots:
     void on_actionOpen_ROM_triggered();
@@ -38,6 +39,8 @@ private slots:
     void on_actionSave_ROM_triggered();
     void on_actionCreate_specific_INI_triggered();
     void on_actionSearch_Text_triggered();
+
+    void on_treeWidget_customContextMenuRequested(const QPoint &pos);
 
 private:
     Ui::MainWindow *ui;

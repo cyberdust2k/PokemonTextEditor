@@ -34,7 +34,7 @@ QList<uint> searchsequence(const QByteArray &seq)
         if (i == slen-1)
             occurrences.push_back((uint)current);
 
-        current = indexof(seq.at(0), (uint)(current + slen));
+        current = indexof(seq.at(0), (uint)(current + i));
     }
 
     return occurrences;
@@ -53,17 +53,6 @@ searchwindow::~searchwindow()
     delete ui;
 }
 
-
-void searchwindow::settree(QTreeWidget *tree)
-{
-    utree = tree;
-}
-
-void searchwindow::setini(QString path)
-{
-    fpini = path;
-}
-
 void searchwindow::setrom(uchar *r, uint n)
 {
     rom = r;
@@ -74,17 +63,30 @@ void searchwindow::setstr(int index)
 {
     if (index == 0)
         ui->pushButton_4->setEnabled(false);
+    else
+        ui->pushButton_4->setEnabled(true);
     if (index == texts.size()-1)
         ui->pushButton_5->setEnabled(false);
+    else
+        ui->pushButton_5->setEnabled(true);
 
     currpos = index;
     ui->plainTextEdit_2->setPlainText(texts.at(index));
 }
 
+QString searchwindow::selected()
+{
+    return texts[currpos];
+}
+
+uint searchwindow::selectedOff()
+{
+    return textoffs[currpos];
+}
+
 void searchwindow::on_pushButton_2_clicked()
 {
-    setResult(0);
-    close();
+    reject();
 }
 
 void searchwindow::on_pushButton_3_clicked()
@@ -95,21 +97,41 @@ void searchwindow::on_pushButton_3_clicked()
 
     QString search = ui->plainTextEdit->toPlainText();
     bool searchbeg = ui->checkBox->isChecked();
+
+    // ignores newline characters
+    search.replace("\n", "");
+
     QByteArray bin = getstringbytes(search);
     if (bin.isNull() || bin.isEmpty())
         return;
 
     // search all occ
-    QList<uint> offsets = searchsequence(bin);
-    if (offsets.isEmpty())
+    textoffs = searchsequence(bin);
+    if (textoffs.isEmpty())
     {
         QMessageBox::warning(this, "Search", "The text could not be found anywhere in the ROM!");
         return;
     }
 
-    foreach (uint off, offsets)
+    foreach (uint off, textoffs)
         texts.push_back(readpokestring(rom, off, searchbeg));
 
     ui->groupBox_2->setEnabled(true);
+    ui->pushButton->setEnabled(true);
     setstr(0);
+}
+
+void searchwindow::on_pushButton_4_clicked()
+{
+    setstr(currpos-1);
+}
+
+void searchwindow::on_pushButton_5_clicked()
+{
+    setstr(currpos+1);
+}
+
+void searchwindow::on_pushButton_clicked()
+{
+    accept();
 }

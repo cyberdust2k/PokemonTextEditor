@@ -1,10 +1,14 @@
 #include "mainwindow.h"
 #include "searchwindow.h"
+#include "insertwindow.h"
 #include "ui_mainwindow.h"
 #include <QFileDialog>
 #include <QMessageBox>
 #include <algorithm>
 #include <string.hpp>
+
+
+bool blockActive = false;
 
 
 MainWindow::MainWindow(QWidget *parent) :
@@ -14,6 +18,8 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->setupUi(this);
     setupui(false);
     loadtable();
+    ui->treeWidget->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(ui->treeWidget, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(on_treeWidget_customContextMenuRequested(QPoint)));
 }
 
 MainWindow::~MainWindow()
@@ -327,6 +333,60 @@ void MainWindow::loadini()
     ui->treeWidget->update();
 }
 
+int reclevel = 0;
+void parseAllChildren(QTreeWidgetItem *parent, QString &output)
+{
+    // add indent
+    for (int i = 0; i < reclevel*4; i++)
+        output.append(' ');
+
+    // add level and text
+    for (int i = 0; i <= reclevel; i++)
+        output.append('-');
+
+    output.append(parent->text(0));
+    output.append('\n');
+
+    // parses all children
+    for (int i = 0; i < parent->childCount(); i++)
+    {
+        QTreeWidgetItem *child = parent->child(i);
+        if (child->data(0, Qt::UserRole).toUInt() == 0) // is folder
+        {
+            reclevel++;
+            parseAllChildren(child, output);
+            reclevel--;
+        }
+        else // is entry
+        {
+            // add indent
+            for (int j = 0; j < (reclevel+1)*4; j++)
+                output.append(' ');
+
+            // add text and offset
+            output.append(child->text(0));
+            output.append("=0x");
+            output.append(QString::number(child->data(0, Qt::UserRole).toUInt(), 16));
+            output.append('\n');
+        }
+    }
+}
+
+void MainWindow::writeini()
+{
+    reclevel = 0;
+
+    QString output = "";
+    QTreeWidgetItem *master = ui->treeWidget->topLevelItem(0);
+    parseAllChildren(master, output);
+
+    QFile fini(fpini);
+    fini.open(QIODevice::WriteOnly);
+    fini.write(output.toUtf8());
+    fini.flush();
+    fini.close();
+}
+
 void MainWindow::on_actionOpen_ROM_triggered()
 {
     QString file = QFileDialog::getOpenFileName(
@@ -362,19 +422,30 @@ void MainWindow::on_actionExit_triggered()
 
 void MainWindow::on_treeWidget_itemDoubleClicked(QTreeWidgetItem *item, int column)
 {
+    // other window owns treeview temporarily
+    if (blockActive)
+        return;
+
     // must be colum zero and a text entry
     if (column != 0)
         return;
 
-    if (item->data(0, Qt::UserRole) == 0)
+    if (item->data(0, Qt::UserRole).toUInt() == 0)
         return;
 
     // loads text and displays it
+    uint textlen = 0;
     uint offs = item->data(0, Qt::UserRole).toUInt();
-    const QString text = readpokestring(byrom, offs);
+    QString text = readpokestring(byrom, offs, false, &textlen);
+    item->setData(1, Qt::UserRole, QVariant(textlen));
+
+    // inserts some readable whitespace
+    text.replace("\\p", "\\p\n");
+    text.replace("\\l", "\\l\n");
+    text.replace("\\n", "\\n\n");
 
     ui->plainTextEdit->setPlainText(text);
-    ui->statusbar2->showMessage(QString("Offset: 0x%0, Length: %1").arg(QString::number(offs, 16), QString::number(text.length())));
+    ui->statusbar2->showMessage(QString("Offset: 0x%0, Length: %1 bytes").arg(QString::number(offs, 16), QString::number(textlen)));
 }
 
 void MainWindow::on_actionSave_ROM_triggered()
@@ -422,12 +493,175 @@ void MainWindow::on_actionCreate_specific_INI_triggered()
 void MainWindow::on_actionSearch_Text_triggered()
 {
     searchwindow sw;
-    sw.settree(ui->treeWidget);
-    sw.setini(fpini);
     sw.setrom(byrom, szrom);
+    sw.exec();
 
-    if (sw.exec() != 0)
+    if (sw.result() == 1)
     {
-        // add ini entry
+        // choose ini entry
+        insertwindow iw;
+        QTreeWidget *w = ui->treeWidget;
+        qint32 max = w->maximumWidth();
+
+        centralWidget()->setUpdatesEnabled(false);
+        disconnect(ui->treeWidget, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(on_treeWidget_customContextMenuRequested(QPoint)));
+        ui->treeWidget->setMaximumWidth(16777215);
+        iw.settree(ui->treeWidget);
+        blockActive = true;
+        iw.exec();
+        blockActive = false;
+        ui->gridLayout->addWidget(w, 0, 0, 2, 1);
+        connect(ui->treeWidget, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(on_treeWidget_customContextMenuRequested(QPoint)));
+        centralWidget()->setUpdatesEnabled(true);
+        w->setMaximumWidth(max);
+
+        if (iw.result() == 1)
+        {
+            // add ini entry
+            QTreeWidgetItem *folder = iw.selected();
+            QTreeWidgetItem *child = iw.inserted();
+            child->setData(0, Qt::UserRole, QVariant(sw.selectedOff()));
+            folder->addChild(child);
+            writeini();
+        }
+    }
+}
+
+bool canRequest = true;
+void MainWindow::on_treeWidget_customContextMenuRequested(const QPoint &pos)
+{
+    QTreeWidgetItem *item = ui->treeWidget->itemAt(pos);
+    if (canRequest)
+    {
+        canRequest = false;
+    }
+    else
+    {
+        canRequest = true;
+        return;
+    }
+
+    if (item->data(0, Qt::UserRole).toUInt() == 0)
+    {
+        // is folder
+        QMenu contextMenu;
+        QAction *addSub = contextMenu.addAction("Add sub-folder");
+        QAction *addTxt = contextMenu.addAction("Add text entry");
+        QAction *remSub = contextMenu.addAction("Remove sub-folder");
+        QAction *rename = contextMenu.addAction("Rename sub-folder");
+        QAction *result = contextMenu.exec(ui->treeWidget->mapToGlobal(pos));
+
+        if (result == addSub)
+        {
+            bool result = false;
+            QString name = QInputDialog::getText(
+                        this,
+                        "Choose folder name",
+                        "Name:",
+                        QLineEdit::Normal,
+                        "Folder",
+                        &result);
+
+            if (result && !name.isEmpty())
+            {
+                QTreeWidgetItem *i = new QTreeWidgetItem;
+                i->setText(0, name);
+                i->setData(0, Qt::UserRole, 0U);
+                item->addChild(i);
+                writeini();
+                ui->treeWidget->update();
+            }
+        }
+        else if (result == addTxt)
+        {
+            bool result = false;
+            QString name = QInputDialog::getText(
+                        this,
+                        "Choose entry name",
+                        "Name:",
+                        QLineEdit::Normal,
+                        "Entry",
+                        &result);
+
+            if (!result || name.isEmpty())
+                return;
+
+            uint acof;
+            QString offs = QInputDialog::getText(
+                        this,
+                        "Choose offset (decimal or hex)",
+                        "Offset (Prefixes 0x, &&H and $ accepted):",
+                        QLineEdit::Normal,
+                        "0x0",
+                        &result);
+
+            bool conv;
+            if (offs.startsWith("0x", Qt::CaseInsensitive) ||
+                offs.startsWith("&H", Qt::CaseInsensitive))
+            {
+                offs.remove(0, 2);
+                acof = offs.toUInt(&conv, 16);
+            }
+            else if (offs.startsWith("$"))
+            {
+                offs.remove(0, 1);
+                acof = offs.toUInt(&conv, 16);
+            }
+            else
+                acof = offs.toUInt(&conv, 10);
+
+            if (conv && (acof == 0 || acof >= szrom))
+            {
+                QMessageBox::warning(
+                            this,
+                            "Add entry",
+                            "Given offset is either zero or is out of the ROM.");
+
+                return;
+            }
+            if (result && conv)
+            {
+                QTreeWidgetItem *i = new QTreeWidgetItem;
+                i->setText(0, name);
+                i->setData(0, Qt::UserRole, acof);
+                item->addChild(i);
+                writeini();
+                ui->treeWidget->update();
+            }
+        }
+        else if (result == remSub)
+        {
+            QString msg("The folder and all it's sub-items will be removed. Do you really want to remove this folder?");
+            QMessageBox::StandardButton result = QMessageBox::question(this, "Folder", msg);
+
+            if (result == QMessageBox::Yes)
+            {
+                item->parent()->removeChild(item);
+                writeini();
+                ui->treeWidget->update();
+            }
+        }
+        else if (result == rename)
+        {
+            bool result = false;
+            QString name = QInputDialog::getText(
+                        this,
+                        "Choose new name",
+                        "Name:",
+                        QLineEdit::Normal,
+                        item->text(0),
+                        &result);
+
+            if (result && !name.isEmpty())
+            {
+                item->setText(0, name);
+                writeini();
+                ui->treeWidget->update();
+            }
+        }
+    }
+    else
+    {
+        // is text entry
     }
 }

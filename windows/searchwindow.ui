@@ -40,6 +40,9 @@
       <height>121</height>
      </rect>
     </property>
+    <property name="toolTip">
+     <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Actual linebreaks will be ignored! Use &lt;span style=&quot; font-style:italic;&quot;&gt;\p&lt;/span&gt;, &lt;span style=&quot; font-style:italic;&quot;&gt;\l&lt;/span&gt; or &lt;span style=&quot; font-style:italic;&quot;&gt;\n&lt;/span&gt; to indicate a linebreak.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+    </property>
     <property name="placeholderText">
      <string>Text to search...</string>
     </property>

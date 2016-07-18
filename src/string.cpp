@@ -42,7 +42,7 @@ void loadtable()
 }
 
 
-const QString readpokestring(uchar *rom, uint offset, bool beg)
+QString readpokestring(uchar *rom, uint offset, bool beg, uint *textlen)
 {
     // read until 0xFF encountered
     QString output;
@@ -71,6 +71,9 @@ const QString readpokestring(uchar *rom, uint offset, bool beg)
         uchar character = bytes.at(i++);
         if (character == 0xF8 || character == 0xF9 || character == 0xFD)
         {
+            if (i >= bytes.size())
+                break;
+
             QString toapp;
             uchar param = bytes.at(i++);
 
@@ -93,6 +96,9 @@ const QString readpokestring(uchar *rom, uint offset, bool beg)
         }
         else if (character == 0xFC)
         {
+            if (i >= bytes.size())
+                break;
+
             QString toapp;
             uchar param = bytes.at(i++);
 
@@ -108,6 +114,9 @@ const QString readpokestring(uchar *rom, uint offset, bool beg)
 
                 if (param > 0 && param < 7)
                 {
+                    if (i >= bytes.size())
+                        break;
+
                     uchar param2 = bytes.at(i++);
                     QString num2 = QString::number(param2, 16);
                     if (num2.length() == 1)
@@ -133,6 +142,8 @@ const QString readpokestring(uchar *rom, uint offset, bool beg)
         }
     }
 
+    if (textlen)
+        *textlen = bytes.size() + 1;
     return output;
 }
 

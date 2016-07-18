@@ -70,7 +70,8 @@ QList<uint> searchsequence(const QByteArray &seq)
 
 const char *MainWindow::readByteArray(int n)
 {
-    char *buffer = new char[n];
+    char *buffer = new char[n+1];
+    buffer[n] = '\0';
     rom.read(buffer, (uint)n);
     return buffer;
 }
@@ -222,7 +223,7 @@ void MainWindow::setupui(bool b)
         romfile.close();
 
         // loads all the rom bytes
-        byrom = new u_int8_t[szrom];
+        byrom = new uchar[szrom];
         rom.read((char*)byrom, szrom);
 
         // load ini etc
@@ -571,6 +572,10 @@ bool canRequest = true;
 void MainWindow::on_treeWidget_customContextMenuRequested(const QPoint &pos)
 {
     QTreeWidgetItem *item = ui->treeWidget->itemAt(pos);
+    if (!item)
+    {
+        return;
+    }
     if (canRequest)
     {
         canRequest = false;

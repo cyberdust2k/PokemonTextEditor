@@ -116,7 +116,7 @@ void searchwindow::on_pushButton_3_clicked()
     }
 
     foreach (uint off, textoffs)
-        texts.push_back(readpokestring(rom, off, searchbeg));
+        texts.push_back(readpokestring(rom, off, searchbeg).replace("\\n", "\\n\n").replace("\\p", "\\p\n").replace("\\l", "\\l\n"));
 
     ui->groupBox_2->setEnabled(true);
     ui->pushButton->setEnabled(true);

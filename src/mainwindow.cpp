@@ -203,6 +203,7 @@ void MainWindow::setupui(bool b)
     if (!b)
     {
         ui->treeWidget->clear();
+        ui->plainTextEdit->clear();
         ui->statusbar->clearMessage();
         ui->statusbar2->clearMessage();
         ui->statusbar2->setStyleSheet("QStatusBar#statusbar2{border-bottom: 1px solid #b9b9b9; background-color: #EFEBE7;}");
@@ -854,4 +855,20 @@ void MainWindow::on_actionWrite_current_text_triggered()
         ui->treeWidget->update();
         on_treeWidget_itemDoubleClicked(last, 0);
     }
+}
+
+void MainWindow::on_plainTextEdit_customContextMenuRequested(const QPoint &pos)
+{
+    QMenu contextMenu;
+
+    // adds CM items dynamically
+    QList<QString> table2 = gettable2();
+    foreach (QString s, table2)
+        contextMenu.addAction(QString("Insert special: " + s))->setData(s);
+
+    // inserts picked item to text
+    QAction *result = contextMenu.exec(ui->plainTextEdit->mapToGlobal(pos));
+    QTextCursor c = ui->plainTextEdit->textCursor();
+    c.insertText(result->data().toString());
+    ui->plainTextEdit->setTextCursor(c);
 }

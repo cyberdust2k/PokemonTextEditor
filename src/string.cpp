@@ -16,6 +16,7 @@
 
 /* Variables */
 QMap<uchar, QString> table;
+QMap<QString, QString> table2;
 
 
 void loadtable()
@@ -37,8 +38,32 @@ void loadtable()
         table.insert(num, strchr);
     }
 
-
     ftbl.close();
+
+
+    // loads secondary table
+    QFile stbl(QApplication::applicationDirPath() + "/ini/" + "Table2.ini");
+    stbl.open(QIODevice::ReadOnly);
+    ttbl = stbl.readAll();
+    tlines = ttbl.split('\n', QString::SkipEmptyParts);
+
+    // loop each line and split pair
+    foreach (QString s,tlines)
+    {
+        qint32 pos = s.indexOf('=');
+        QString key = s.left(pos);
+        QString val = s.mid(pos+1);
+
+        table2.insert(key, val);
+    }
+
+    stbl.close();
+}
+
+
+QList<QString> gettable2()
+{
+    return table2.values();
 }
 
 
@@ -144,11 +169,22 @@ QString readpokestring(uchar *rom, uint offset, bool beg, uint *textlen)
 
     if (textlen)
         *textlen = bytes.size();
+
+
+    // parses special sequences
+    for (int i = 0; i < table2.size(); i++)
+        output.replace(table2.keys().at(i), table2.values().at(i));
+
     return output;
 }
 
-QByteArray getstringbytes(const QString &str)
+QByteArray getstringbytes(QString &str)
 {
+    // before parsing actual text, pre-parses special sequences
+    for (int i = 0; i < table2.size(); i++)
+        str.replace(table2.values().at(i), table2.keys().at(i));
+
+
     QByteArray output;
     for (int i = 0; i < str.length();)
     {
@@ -177,6 +213,7 @@ QByteArray getstringbytes(const QString &str)
                     return QByteArray();
                 }
 
+                i++;
                 output.push_back((uchar)conv);
             }
         }

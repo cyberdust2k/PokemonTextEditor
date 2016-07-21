@@ -43,12 +43,15 @@ private slots:
     void on_actionAbout_triggered();
     void on_actionWrite_current_text_triggered();
 
+    void on_plainTextEdit_customContextMenuRequested(const QPoint &pos);
+
 private:
     Ui::MainWindow *ui;
     std::fstream rom;
     uint bypos;
     QString fprom;
     QString fpini;
+    QString fpspd;
     QTreeWidgetItem *last;
 };
 

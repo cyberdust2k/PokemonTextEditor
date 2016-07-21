@@ -15,9 +15,10 @@
 
 
 extern void loadtable();
+extern QList<QString> gettable2();
 extern QString readpokestring(uchar *rom, uint offset, bool beg = false, uint *textlen = NULL);
 extern void writepokestring(uchar *rom, uint offset, const QString &str);
-extern QByteArray getstringbytes(const QString &str);
+extern QByteArray getstringbytes(QString &str);
 
 
 #endif

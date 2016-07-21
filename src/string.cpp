@@ -143,7 +143,7 @@ QString readpokestring(uchar *rom, uint offset, bool beg, uint *textlen)
     }
 
     if (textlen)
-        *textlen = bytes.size() + 1;
+        *textlen = bytes.size();
     return output;
 }
 

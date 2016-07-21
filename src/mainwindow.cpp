@@ -416,8 +416,11 @@ void MainWindow::writeini()
     reclevel = 0;
 
     QString output = "";
-    QTreeWidgetItem *master = ui->treeWidget->topLevelItem(0);
-    parseAllChildren(master, output);
+    for (int i = 0; i < ui->treeWidget->topLevelItemCount(); i++)
+    {
+        QTreeWidgetItem *master = ui->treeWidget->topLevelItem(i);
+        parseAllChildren(master, output);
+    }
 
     QFile fini(fpini);
     fini.open(QIODevice::WriteOnly);
@@ -726,6 +729,7 @@ void MainWindow::on_treeWidget_customContextMenuRequested(const QPoint &pos)
                 i->setText(0, name);
                 i->setData(0, Qt::UserRole, 0U);
                 ui->treeWidget->addTopLevelItem(i);
+                writeini();
                 ui->treeWidget->update();
             }
         }
@@ -834,6 +838,7 @@ void MainWindow::on_actionWrite_current_text_triggered()
 
     // write text
     seek(offtowrite);
+    bytes.append((char)0xFF);
     uchar *current = byrom + bypos;
     for (int i = 0; i < bytes.size(); i++)
         current[i] = (uchar)bytes.at(i);

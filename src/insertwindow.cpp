@@ -19,8 +19,10 @@ insertwindow::~insertwindow()
     delete ui;
 }
 
+// this is a comment
 void insertwindow::settree(QTreeWidget *t)
 {
+    int i = 0;
     oldparent = t->parentWidget();
     ui->gridLayout->removeWidget(ui->treeWidget);
     ui->gridLayout->addWidget(t);
